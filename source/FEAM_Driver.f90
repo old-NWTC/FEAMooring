@@ -45,7 +45,7 @@ PROGRAM Main
   ! -------------------------------------------------------------------------
   
   t_initial = 0.
-  t_final   = 500
+  t_final   = 50 !500
   
   ! specify time increment; currently, all modules will be time integrated with this increment size
   dt_global = 0.01
@@ -63,13 +63,14 @@ PROGRAM Main
   ! @bonnie : This is in the FAST developers glue code example, but it's probably not needed here. 
   Allocate(FEAM_Input(FEAM_interp_order + 1))  
     
-  ! set the MAP input file name and other environment terms.
+  ! set the FEAM input file name and other environment terms.
   FEAM_InitInput%InputFile    = "FE_Mooring.dat"  ! @bonnie : This needs to be set according to what is in the FAST input file. 
-  !FEAM_InitInput%gravity     = 9.81          ! @bonnie : This need to be according to g used in FAST
-  !FEAM_InitInput%sea_density = 1025          ! @bonnie : This needs to be set according to seawater density in FAST
-  !FEAM_InitInput%depth       = 150           ! @bonnie : This need to be set according to the water depth in FAST
-  !FEAM_Parameter%dt = dt_global              ! @bonnie : This is for the glue code to set
-
+  FEAM_InitInput%NStepWave   = 1                          ! an arbitrary number > 0 (to set the size of the wave data, which currently contains all zero values)     
+  FEAM_InitInput%gravity     = 9.81     ! This need to be according to g used in ElastoDyn 
+  FEAM_InitInput%WtrDens     = 1025     ! This needs to be set according to seawater density in HydroDyn      
+  FEAM_InitInput%PtfmInit    = 0.0
+  FEAM_InitInput%RootName    = "FE_Mooring"
+  
   OPEN(Unit=1,FILE='FEAM.out',STATUS='UNKNOWN')
   OPEN(Unit=2,FILE='FEAM_TTN1.out',STATUS='UNKNOWN')
   OPEN(Unit=3,FILE='FEAM_TTN2.out',STATUS='UNKNOWN')
@@ -205,7 +206,7 @@ PROGRAM Main
 
      WRITE(1,100) t_global, FEAM_Input(1)%PtFairleadDisplacement%TranslationDisp(1,1), &
      ((FEAM_Output%PtFairleadLoad%Force(i,j), i=1,3),j=1,3)
-     WRITE(*,*) t_global
+     !WRITE(*,*) t_global
      
   END DO
   ! -------------------------------------------------------------------------

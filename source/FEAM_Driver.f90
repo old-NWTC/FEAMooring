@@ -38,7 +38,7 @@ PROGRAM Main
   ! Local variables
   Integer(IntKi)                         :: i                    ! counter for various loops
   Integer(IntKi)                         :: j                    ! counter for various loops
- 
+  integer(intKi)                         :: Un
   
   ! -------------------------------------------------------------------------
   ! Initialization of glue-code time-step variables
@@ -71,10 +71,11 @@ PROGRAM Main
   FEAM_InitInput%PtfmInit    = 0.0
   FEAM_InitInput%RootName    = "FE_Mooring"
   
-  OPEN(Unit=1,FILE='FEAM.out',STATUS='UNKNOWN')
-  OPEN(Unit=2,FILE='FEAM_TTN1.out',STATUS='UNKNOWN')
-  OPEN(Unit=3,FILE='FEAM_TTN2.out',STATUS='UNKNOWN')
-  OPEN(Unit=4,FILE='FEAM_TTN3.out',STATUS='UNKNOWN')
+  CALL GetNewUnit( Un )
+  OPEN(Unit=Un,FILE='FEAM.out',STATUS='UNKNOWN')
+  !OPEN(Unit=2,FILE='FEAM_TTN1.out',STATUS='UNKNOWN')
+  !OPEN(Unit=3,FILE='FEAM_TTN2.out',STATUS='UNKNOWN')
+  !OPEN(Unit=4,FILE='FEAM_TTN3.out',STATUS='UNKNOWN')
 
   ! call the initialization routine
   CALL FEAM_Init( FEAM_InitInput       , &
@@ -89,9 +90,10 @@ PROGRAM Main
                  FEAM_InitOutput      , &
                  ErrStat             , &
                  ErrMsg )  
-  IF ( ErrStat .NE. 0 ) THEN
-     CALL WrScr(ErrMsg) 
-  END IF  
+     IF ( ErrStat .NE. ErrID_None ) THEN
+        IF (ErrStat >=AbortErrLev) CALL ProgAbort(ErrMsg)
+        CALL WrScr( ErrMsg )
+     END IF
   
   CALL DispNVD( FEAM_InitOutput%Ver ) 
 
@@ -183,9 +185,10 @@ PROGRAM Main
                              FEAM_OtherState      , &
                              ErrStat             , &
                              ErrMsg )    
-     IF ( ErrStat .NE. 0 ) THEN
-        CALL WrScr(ErrMsg) 
-    END IF
+     IF ( ErrStat .NE. ErrID_None ) THEN
+        IF (ErrStat >=AbortErrLev) CALL ProgAbort(ErrMsg)
+        CALL WrScr( ErrMsg )
+     END IF
   
      CALL FEAM_CalcOutput( t_global            , &
                           FEAM_Input(1)        , &
@@ -197,14 +200,15 @@ PROGRAM Main
                           FEAM_Output          , &
                           ErrStat             , &
                           ErrMsg )
-     IF ( ErrStat .NE. 0 ) THEN
-        CALL WrScr(ErrMsg) 
+     IF ( ErrStat .NE. ErrID_None ) THEN
+        IF (ErrStat >=AbortErrLev) CALL ProgAbort(ErrMsg)
+        CALL WrScr( ErrMsg )
      END IF
   
      ! update the global time step by one delta t
      t_global = ( n_t_global + 1 )* dt_global + t_initial
 
-     WRITE(1,100) t_global, FEAM_Input(1)%PtFairleadDisplacement%TranslationDisp(1,1), &
+     WRITE(Un,100) t_global, FEAM_Input(1)%PtFairleadDisplacement%TranslationDisp(1,1), &
      ((FEAM_Output%PtFairleadLoad%Force(i,j), i=1,3),j=1,3)
      !WRITE(*,*) t_global
      
@@ -235,15 +239,17 @@ PROGRAM Main
                 FEAM_Output          , &
                 ErrStat             , &
                 ErrMsg )  
-  IF ( ErrStat .NE. 0 ) THEN
-     WRITE(*,*) ErrMsg 
+  IF ( ErrStat .NE. ErrID_None ) THEN
+     IF (ErrStat >=AbortErrLev) CALL ProgAbort(ErrMsg)
+     CALL WrScr( ErrMsg )
   END IF  
 
   DEALLOCATE(FEAM_InputTimes)
   DEALLOCATE(FEAM_OutputTimes)
   
-  WRITE(*,*) "Program has ended"
-
+  CALL WrScr( "Program has ended" )
+  close (un) 
+  
 100 FORMAT(2(1X,F8.3),9(1X,E12.5))
      
 END PROGRAM Main

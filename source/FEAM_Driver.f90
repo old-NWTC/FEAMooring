@@ -21,17 +21,16 @@ PROGRAM Main
   TYPE (FEAM_InitInputType)               :: FEAM_InitInput    
   TYPE (FEAM_ParameterType)               :: FEAM_Parameter
   TYPE (FEAM_ContinuousStateType)         :: FEAM_ContinuousState
-  TYPE (FEAM_ContinuousStateType)         :: FEAM_ContinuousStateDeriv
   TYPE (FEAM_InitOutputType)              :: FEAM_InitOutput    
   TYPE (FEAM_DiscreteStateType)           :: FEAM_DiscreteState
   TYPE (FEAM_ConstraintStateType)         :: FEAM_ConstraintState
   TYPE (FEAM_OtherStateType)              :: FEAM_OtherState
+  TYPE (FEAM_MiscVarType)                 :: FEAM_MiscVar
 
   TYPE (FEAM_InputType),      ALLOCATABLE :: FEAM_Input(:)
   REAL(DbKi) , DIMENSION(:), ALLOCATABLE :: FEAM_InputTimes
 
   TYPE (FEAM_OutputType)                  :: FEAM_Output
-  REAL(DbKi) , DIMENSION(:), ALLOCATABLE :: FEAM_OutputTimes
 
   INTEGER(IntKi)                         :: FEAM_interp_order     ! order of interpolation/extrapolation
   
@@ -57,7 +56,6 @@ PROGRAM Main
   FEAM_interp_order = 0
 
   ! MAP: allocate Input and Output arrays; used for interpolation and extrapolation
-  Allocate(FEAM_OutputTimes(FEAM_interp_order + 1)) 
   Allocate(FEAM_InputTimes(FEAM_interp_order + 1)) 
 
   ! @bonnie : This is in the FAST developers glue code example, but it's probably not needed here. 
@@ -78,87 +76,67 @@ PROGRAM Main
   !OPEN(Unit=4,FILE='FEAM_TTN3.out',STATUS='UNKNOWN')
 
   ! call the initialization routine
-  CALL FEAM_Init( FEAM_InitInput       , &
-                 FEAM_Input(1)        , & 
-                 FEAM_Parameter       , &
-                 FEAM_ContinuousState , &
-                 FEAM_DiscreteState   , &
-                 FEAM_ConstraintState , & 
-                 FEAM_OtherState      , &
-                 FEAM_Output          , &
-                 dt_global           , &
-                 FEAM_InitOutput      , &
-                 ErrStat             , &
-                 ErrMsg )  
+  CALL FEAM_Init( FEAM_InitInput      , &
+                  FEAM_Input(1)        , & 
+                  FEAM_Parameter       , &
+                  FEAM_ContinuousState , &
+                  FEAM_DiscreteState   , &
+                  FEAM_ConstraintState , & 
+                  FEAM_OtherState      , &
+                  FEAM_Output          , &
+                  FEAM_MiscVar         , &
+                  dt_global            , &
+                  FEAM_InitOutput      , &
+                  ErrStat              , &
+                  ErrMsg )  
      IF ( ErrStat .NE. ErrID_None ) THEN
         IF (ErrStat >=AbortErrLev) CALL ProgAbort(ErrMsg)
         CALL WrScr( ErrMsg )
      END IF
   
+  CALL FEAM_DestroyInitInput  ( FEAM_InitInput  , ErrStat, ErrMsg )
+  CALL FEAM_DestroyInitOutput ( FEAM_InitOutput , ErrStat, ErrMsg )
+     
   CALL DispNVD( FEAM_InitOutput%Ver ) 
 
-  DO i = 1, FEAM_interp_order + 1  
-      FEAM_InputTimes(i) = t_initial - (i - 1) * dt_global
-      FEAM_OutputTimes(i) = t_initial - (i - 1) * dt_global
-   ENDDO
-   
+     
+  FEAM_Input(1)%PtFairleadDisplacement%TranslationDisp = 0.0 
+  
   DO i = 2, FEAM_interp_order + 1  
      CALL FEAM_CopyInput( FEAM_Input(1), FEAM_Input(i), MESH_NEWCOPY, ErrStat, ErrMsg )
   END DO
 
+  DO i = 1, FEAM_interp_order + 1  
+      FEAM_InputTimes(i) = t_initial - (i - 1) * dt_global
+  ENDDO
 
-  ! should probably delete this at the end bc save/retrieve will need it
-  !................
-  !@marco, some questions:
-  ! 1) why will save/retrieve need this? Unless you're using the data type later, I don't know why we'd pack the InitInput/Output data.
-  ! 2) I don't want to have to call FEAM_InitInput_Destroy in my glue code; I don't want the glue code to act any differently for C or Fortran code.
-  !    Can we call FEAM_InitInput_Destroy from FEAM_DestroyInitInput?
-  ! 3) Same as (2) for FEAM_InitOutput_Destroy.
-  !................
-!  CALL FEAM_InitInput_Destroy ( FEAM_InitInput%C_obj%object )  
-  CALL FEAM_DestroyInitInput  ( FEAM_InitInput , ErrStat, ErrMsg )
-
-!  CALL FEAM_InitOutput_Destroy( FEAM_InitOutput%C_obj%object )  
-  CALL FEAM_DestroyInitOutput ( FEAM_InitOutput , ErrStat, ErrMsg )
-
-  ! @bonnie : don't we need to initialize the messhes once?
-  IF (FEAM_interp_order .EQ. 2) THEN
-     DO i = 1,FEAM_Input(3)%PtFairleadDisplacement%NNodes
-        FEAM_Input(3)%PtFairleadDisplacement%TranslationDisp(1,i) = 0.0  
-        FEAM_Input(3)%PtFairleadDisplacement%TranslationDisp(2,i) = 0.0
-        FEAM_Input(3)%PtFairleadDisplacement%TranslationDisp(3,i) = 0.0
-     END DO
-     DO i = 1,FEAM_Input(2)%PtFairleadDisplacement%NNodes
-        FEAM_Input(2)%PtFairleadDisplacement%TranslationDisp(1,i) = 0.0  
-        FEAM_Input(2)%PtFairleadDisplacement%TranslationDisp(2,i) = 0.0
-        FEAM_Input(2)%PtFairleadDisplacement%TranslationDisp(3,i) = 0.0
-     END DO
-  ELSE IF (FEAM_interp_order .EQ. 1) THEN
-     DO i = 1,FEAM_Input(2)%PtFairleadDisplacement%NNodes
-        FEAM_Input(2)%PtFairleadDisplacement%TranslationDisp(1,i) = 0.0  
-        FEAM_Input(2)%PtFairleadDisplacement%TranslationDisp(2,i) = 0.0
-        FEAM_Input(2)%PtFairleadDisplacement%TranslationDisp(3,i) = 0.0
-     END DO
-  END IF
-  DO i = 1,FEAM_Input(1)%PtFairleadDisplacement%NNodes
-     FEAM_Input(1)%PtFairleadDisplacement%TranslationDisp(1,i) = 0.0  
-     FEAM_Input(1)%PtFairleadDisplacement%TranslationDisp(2,i) = 0.0
-     FEAM_Input(1)%PtFairleadDisplacement%TranslationDisp(3,i) = 0.0
-  END DO
 
   
   ! -------------------------------------------------------------------------
   ! BEGIN time marching
   ! -------------------------------------------------------------------------
+   CALL FEAM_CalcOutput( t_global            , &
+                        FEAM_Input(1)        , &
+                        FEAM_Parameter       , &
+                        FEAM_ContinuousState , &
+                        FEAM_DiscreteState   , &
+                        FEAM_ConstraintState , &
+                        FEAM_OtherState      , &
+                        FEAM_Output          , &
+                        FEAM_MiscVar         , &        
+                        ErrStat              , &
+                        ErrMsg )
+   IF ( ErrStat .NE. ErrID_None ) THEN
+      IF (ErrStat >=AbortErrLev) CALL ProgAbort(ErrMsg)
+      CALL WrScr( ErrMsg )
+   END IF
+     
   DO n_t_global = 0, n_t_final
 
      t_global =  t_initial + dt_global*n_t_global
 
      !==========   NOTE   ======     <-----------------------------------------+
-     ! @bonnie : I am assuming this FEAM_InputTimes{:} and FEAM_Input{:} 
-     !           will be assigned by the glue code   
-
-     !FEAM_InputTimes(1) = t_global + dt_global
+     FEAM_InputTimes(1) = t_global + dt_global
      !FEAM_InputTimes(2) = FEAM_InputTimes(1) - dt_global 
      !FEAM_InputTimes(3) = FEAM_InputTimes(2) - dt_global
      
@@ -175,7 +153,7 @@ PROGRAM Main
      ! @bonnie & @jason: the FAST glue code will update the new fairlead position 
      !                   based on the new platform position in the global frame.
      CALL  FEAM_UpdateStates( t_global            , &
-                             n_t_global          , &
+                             n_t_global           , &
                              FEAM_Input           , &
                              FEAM_InputTimes      , &
                              FEAM_Parameter       , &
@@ -183,7 +161,8 @@ PROGRAM Main
                              FEAM_DiscreteState   , &
                              FEAM_ConstraintState , &
                              FEAM_OtherState      , &
-                             ErrStat             , &
+                             FEAM_MiscVar         , &        
+                             ErrStat              , &
                              ErrMsg )    
      IF ( ErrStat .NE. ErrID_None ) THEN
         IF (ErrStat >=AbortErrLev) CALL ProgAbort(ErrMsg)
@@ -198,7 +177,8 @@ PROGRAM Main
                           FEAM_ConstraintState , &
                           FEAM_OtherState      , &
                           FEAM_Output          , &
-                          ErrStat             , &
+                          FEAM_MiscVar         , &        
+                          ErrStat              , &
                           ErrMsg )
      IF ( ErrStat .NE. ErrID_None ) THEN
         IF (ErrStat >=AbortErrLev) CALL ProgAbort(ErrMsg)
@@ -216,36 +196,29 @@ PROGRAM Main
   ! -------------------------------------------------------------------------
   ! END time marching
   ! -------------------------------------------------------------------------
-
-
-  !==========   NOTE   ======     <-----------------------------------------+
-  ! @bonnie : I am assuming the glue code will do this
-  IF (FEAM_interp_order .EQ. 1) THEN  
-     CALL MeshDestroy(FEAM_Input(2)%PtFairleadDisplacement, ErrStat,ErrMsg)
-  ELSE IF (FEAM_interp_order .EQ. 2) THEN
-     CALL MeshDestroy(FEAM_Input(2)%PtFairleadDisplacement, ErrStat,ErrMsg)
-     CALL MeshDestroy(FEAM_Input(3)%PtFairleadDisplacement, ErrStat,ErrMsg)
-  END IF
-  !===========================================================================
-
   
   ! Destroy all objects
-  CALL FEAM_End( FEAM_Input(1)        , &
+  CALL FEAM_End( FEAM_Input(1)       , &
                 FEAM_Parameter       , &
                 FEAM_ContinuousState , &
                 FEAM_DiscreteState   , &
                 FEAM_ConstraintState , & 
                 FEAM_OtherState      , &
                 FEAM_Output          , &
-                ErrStat             , &
+                FEAM_MiscVar         , &
+                ErrStat              , &
                 ErrMsg )  
   IF ( ErrStat .NE. ErrID_None ) THEN
      IF (ErrStat >=AbortErrLev) CALL ProgAbort(ErrMsg)
      CALL WrScr( ErrMsg )
   END IF  
 
+  do j = 2,FEAM_interp_order+1
+     call FEAM_DestroyInput( FEAM_Input(j), ErrStat, ErrMsg)
+  end do  
+  
+  DEALLOCATE(FEAM_Input)
   DEALLOCATE(FEAM_InputTimes)
-  DEALLOCATE(FEAM_OutputTimes)
   
   CALL WrScr( "Program has ended" )
   close (un) 

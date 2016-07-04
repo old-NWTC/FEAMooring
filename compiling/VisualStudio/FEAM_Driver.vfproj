@@ -67,7 +67,7 @@
 		<File RelativePath="..\..\source\dependencies\NWTC_Library\SingPrec.f90"/>
 		<File RelativePath="..\..\source\dependencies\NWTC_Library\SysIVF.f90"/></Filter>
 		<File RelativePath="..\..\source\FEAM.f90"/>
-		<File RelativePath="..\..\Source\FEAM_Driver.f90"/>
+		<File RelativePath="..\..\Source\driver\FEAM_Driver.f90"/>
 		<File RelativePath="..\..\Source\FEAMooring_Types.f90">
 			<FileConfiguration Name="Debug|Win32">
 				<Tool Name="VFFortranCompilerTool" WarnDeclarations="false" WarnUnusedVariables="false"/></FileConfiguration>
